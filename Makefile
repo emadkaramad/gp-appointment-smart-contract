@@ -52,3 +52,7 @@ hardhat-test:
 .PHONY: hardhat-deploy
 hardhat-deploy:
 	cd hardhat && bun run deploy && cd -
+
+.PHONY: format
+format:
+	bunx prettier --write .

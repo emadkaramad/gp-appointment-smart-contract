@@ -1,4 +1,5 @@
 # Private GP appointment system
+
 This project is an appointment system for a private GP using smart contracts.
 
 ## Stack
