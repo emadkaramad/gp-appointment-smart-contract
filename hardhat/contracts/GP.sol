@@ -17,8 +17,8 @@ contract GP {
     using PatientsHelper for PatientsHelper.Patients;
     using NotesHelper for NotesHelper.Notes;
 
-    event AppointmentBooked(uint256, address, uint256);
-    event AppointmentCancelled(uint256, address, uint256);
+    event AppointmentBooked(uint256 indexed bookingId, address indexed doctorAddress, uint256 indexed appointmentDate);
+    event AppointmentCancelled(uint256 indexed bookingId, address indexed doctorAddress, uint256 indexed appointmentDate);
 
     string public name;
 
@@ -47,7 +47,7 @@ contract GP {
     function addAdmin(
         address adminAddress,
         string calldata adminName
-    ) public onlyAdmin {
+    ) external onlyAdmin {
         admins.add(adminAddress, adminName);
     }
 
@@ -55,7 +55,7 @@ contract GP {
         address doctorAddress,
         string calldata doctorName,
         string calldata specialty
-    ) public onlyAdmin {
+    ) external onlyAdmin {
         doctors.add(doctorAddress, doctorName, specialty);
     }
 
@@ -64,7 +64,7 @@ contract GP {
         string calldata patientName,
         uint256 dateOfBirth,
         Sex birthSex
-    ) public onlyAdmin {
+    ) external onlyAdmin {
         _addPatient(patientAddress, patientName, dateOfBirth, birthSex);
     }
 
@@ -72,8 +72,17 @@ contract GP {
         string calldata patientName,
         uint256 dateOfBirth,
         Sex birthSex
-    ) public {
+    ) external {
         _addPatient(msg.sender, patientName, dateOfBirth, birthSex);
+    }
+
+    function addBooking(
+        uint256 date,
+        string memory dateKey,
+        address doctorAddress,
+        uint256 fee
+    ) external onlyAdmin {
+        bookings.add(date, dateKey, doctorAddress, fee);
     }
 
     function book(
@@ -91,34 +100,46 @@ contract GP {
         _withdrawPatientBalance(msg.sender);
     }
 
-    function getAdmins() public view onlyAdmin returns (address[] memory) {
+    function getAdmins() external view onlyAdmin returns (address[] memory) {
         return admins.get();
     }
 
     function getAdmin(
         address adminAddress
-    ) public view onlyAdmin returns (Admin memory) {
+    ) external view onlyAdmin returns (Admin memory) {
         return admins.get(adminAddress);
     }
 
-    function getPatients() public view onlyAdmin returns (address[] memory) {
+    function getPatients() external view onlyAdmin returns (address[] memory) {
         return patients.get();
     }
 
     function getPatient(
         address patientAddress
-    ) public view onlyAdmin returns (Patient memory) {
+    ) external view onlyAdmin returns (Patient memory) {
         return patients.get(patientAddress);
     }
 
-    function getDoctors() public view returns (address[] memory) {
+    function getDoctors() external view returns (address[] memory) {
         return doctors.get();
     }
 
     function getDoctor(
         address doctorAddress
-    ) public view returns (Doctor memory) {
+    ) external view returns (Doctor memory) {
         return doctors.get(doctorAddress);
+    }
+
+    function getBookings(
+        string calldata dateKey
+    ) external view returns (uint256[] memory) {
+        return bookings.getByDate(dateKey);
+    }
+
+    function getBooking(
+        uint256 bookingId
+    ) external view returns (Booking memory) {
+        return bookings.get(bookingId);
     }
 
     //
@@ -207,7 +228,10 @@ contract GP {
             );
             patients.increaseBalance(booking.patientAddress, refundAmount);
             notes.add(
-                string.concat("Refunded amount: ", Strings.toString(refundAmount)),
+                string.concat(
+                    "Refunded amount: ",
+                    Strings.toString(refundAmount)
+                ),
                 cancelBy,
                 booking.patientAddress
             );
@@ -228,7 +252,9 @@ contract GP {
 
         patients.decreaseBalance(patientAddress, patientBalance);
 
-        (bool refunded, ) = payable(patientAddress).call{value: patientBalance}("");
+        (bool refunded, ) = payable(patientAddress).call{value: patientBalance}(
+            ""
+        );
         if (refunded == false) {
             revert GP__WithdrawPatientBalance__RefundFailed();
         }

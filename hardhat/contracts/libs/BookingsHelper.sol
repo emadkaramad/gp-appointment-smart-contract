@@ -106,6 +106,10 @@ library BookingsHelper {
         Bookings storage bookings,
         uint256 bookingId
     ) internal view returns (bool) {
+        if(bookingId < 0 || bookingId > bookings.bookings.length) {
+            return false;
+        }
+
         return get(bookings, bookingId).active == true;
     }
 }
