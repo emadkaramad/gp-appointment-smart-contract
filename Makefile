@@ -1,34 +1,40 @@
 SHELL := /bin/bash
-RUNTIME ?= bun
-RUNTIMEX ?= bunx
+USE ?= bun
+ifeq (${USE}, npm)
+	PACKAGE_MANAGER ?= npm
+	PACKAGE_EXECUTOR ?= npx
+else
+	PACKAGE_MANAGER ?= bun
+	PACKAGE_EXECUTOR ?= bunx
+endif
 
 .PHONY: install
 install:
 	@( \
 		cd hardhat && \
 		echo "🏗  Installing hardhat packages..." && \
-		${RUNTIME} install --silent \
+		${PACKAGE_MANAGER} install --silent \
 	)
 	@( \
 		cd app && \
 		echo "🏗  Installing web app packages..." && \
-		${RUNTIME} install --silent \
+		${PACKAGE_MANAGER} install --silent \
 	)
 
 .PHONY: run
 run:
-	@${RUNTIMEX} pm2 flush --silent
+	@${PACKAGE_EXECUTOR} pm2 flush --silent
 	@( \
 		cd hardhat && \
 		echo "🚀 Starting hardhat node..." && \
-		${RUNTIMEX} pm2 delete hardhat-node --silent 2>/dev/null ||: && \
-		${RUNTIMEX} pm2 start "${RUNTIME} run node" --name hardhat-node --namespace web3 --silent \
+		${PACKAGE_EXECUTOR} pm2 delete hardhat-node --silent 2>/dev/null ||: && \
+		${PACKAGE_EXECUTOR} pm2 start "${PACKAGE_MANAGER} run node" --name hardhat-node --namespace web3 --silent \
 	)
 	@( \
 		cd app && \
 		echo "🚀 Starting web app..." && \
-		${RUNTIMEX} pm2 delete app --silent 2>/dev/null ||: && \
-		${RUNTIMEX} pm2 start "${RUNTIME} run start" --name app --namespace web3 --silent \
+		${PACKAGE_EXECUTOR} pm2 delete app --silent 2>/dev/null ||: && \
+		${PACKAGE_EXECUTOR} pm2 start "${PACKAGE_MANAGER} run start" --name app --namespace web3 --silent \
 	)
 	@echo "✅ Started" \
 
@@ -39,26 +45,26 @@ start: install run
 stop:
 	@( \
 		echo "🟡 Stopping..." && \
-		${RUNTIMEX} pm2 delete web3 --silent 2>/dev/null && \
+		${PACKAGE_EXECUTOR} pm2 delete web3 --silent 2>/dev/null && \
 		echo "🔴 Stopped" \
 	)
 
 .PHONY: hardhat-logs
 hardhat-logs:
-	${RUNTIMEX} pm2 logs hardhat-node --lines 2000
+	${PACKAGE_EXECUTOR} pm2 logs hardhat-node --lines 2000
 
 .PHONY: app-logs
 app-logs:
-	${RUNTIMEX} pm2 logs app --lines 2000
+	${PACKAGE_EXECUTOR} pm2 logs app --lines 2000
 
 .PHONY: hardhat-test
 hardhat-test:
-	cd hardhat && ${RUNTIME} run test && cd -
+	cd hardhat && ${PACKAGE_MANAGER} run test && cd -
 
 .PHONY: hardhat-deploy
 hardhat-deploy:
-	cd hardhat && ${RUNTIME} run deploy && cd -
+	cd hardhat && ${PACKAGE_MANAGER} run deploy && cd -
 
 .PHONY: format
 format:
-	${RUNTIMEX} prettier --write .
+	${PACKAGE_EXECUTOR} prettier --write .

@@ -10,18 +10,34 @@ defaults:
   run:
     shell: bash
 
-env:
-  RUNTIME: ~/.bun/bin/bun
-  RUNTIMEX: ~/.bun/bin/bunx
-
 jobs:
-  build-test:
+  bun-build-test:
     runs-on: ubuntu-latest
+    env:
+      PACKAGE_MANAGER: ~/.bun/bin/bun
+      PACKAGE_EXECUTOR: ~/.bun/bin/bunx
     steps:
       - uses: actions/checkout@v3
 
       - name: Install Bun runtime
         run: curl -fsSL https://bun.sh/install | bash
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Run hardhat tests
+        run: make hardhat-test
+
+  npm-build-test:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGE_MANAGER: npm
+      PACKAGE_EXECUTOR: npx
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
 
       - name: Install dependencies
         run: make install
