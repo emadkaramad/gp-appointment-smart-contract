@@ -11,6 +11,11 @@ endif
 .PHONY: install
 install:
 	@( \
+		cd common && \
+		echo "🏗  Installing common packages..." && \
+		${PACKAGE_MANAGER} install --silent \
+	)
+	@( \
 		cd hardhat && \
 		echo "🏗  Installing hardhat packages..." && \
 		${PACKAGE_MANAGER} install --silent \

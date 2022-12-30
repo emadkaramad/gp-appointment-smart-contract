@@ -3,7 +3,7 @@ import { expect } from "chai"
 import { ethers } from "hardhat"
 import { GP } from "../typechain-types"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { BookingStatus, Sex } from "./enums"
+import { BookingStatus, Sex } from "../../common"
 
 const getTime = (date: Date | string) => {
   return Math.floor(new Date(date).getTime() / 1000)
