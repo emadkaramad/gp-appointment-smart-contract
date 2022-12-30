@@ -17,8 +17,16 @@ contract GP {
     using PatientsHelper for PatientsHelper.Patients;
     using NotesHelper for NotesHelper.Notes;
 
-    event AppointmentBooked(uint256 indexed bookingId, address indexed doctorAddress, uint256 indexed appointmentDate);
-    event AppointmentCancelled(uint256 indexed bookingId, address indexed doctorAddress, uint256 indexed appointmentDate);
+    event AppointmentBooked(
+        uint256 indexed bookingId,
+        address indexed doctorAddress,
+        uint256 indexed appointmentDate
+    );
+    event AppointmentCancelled(
+        uint256 indexed bookingId,
+        address indexed doctorAddress,
+        uint256 indexed appointmentDate
+    );
 
     string public name;
 
@@ -100,6 +108,16 @@ contract GP {
         _withdrawPatientBalance(msg.sender);
     }
 
+    function markBookingAsNoShowUp(uint256 bookingId) external onlyDoctor(bookingId) {
+        bookings.markAsNoShowUp(bookingId);
+    }
+
+    function markBookingAsVisited(uint256 bookingId, string memory note) external onlyDoctor(bookingId) {
+        bookings.markAsVisited(bookingId);
+        Booking memory booking = bookings.get(bookingId);
+        notes.add(note, msg.sender, booking.patientAddress, bookingId);
+    }
+
     function getAdmins() external view onlyAdmin returns (address[] memory) {
         return admins.get();
     }
@@ -139,7 +157,17 @@ contract GP {
     function getBooking(
         uint256 bookingId
     ) external view returns (Booking memory) {
-        return bookings.get(bookingId);
+        return _getBooking(bookingId);
+    }
+
+    function getNotes(
+        address userAddress
+    ) external view returns (uint256[] memory) {
+        return notes.get(userAddress);
+    }
+
+    function getNote(uint256 noteId) external view returns (Note memory) {
+        return notes.get(noteId);
     }
 
     //
@@ -175,12 +203,14 @@ contract GP {
             revert GP__Book__NotAvailable();
         }
 
-        if (msg.value < bookings.get(bookingId).fee) {
+        Booking memory booking = bookings.get(bookingId);
+
+        if (msg.value < booking.fee) {
             revert GP__Book__InvalidFeePaid();
         }
 
-        bookings.book(bookingId, patientAddress, note);
-        Booking memory booking = bookings.get(bookingId);
+        bookings.book(bookingId, patientAddress);
+        notes.add(note, msg.sender, patientAddress);
 
         emit AppointmentBooked(
             bookingId,
@@ -201,20 +231,28 @@ contract GP {
             revert GP__CancelBooking__InvalidBooking();
         }
 
-        if (bookings.isBookedAndAwaitingVisit(bookingId)) {
+        if (bookings.isBookedAndAwaitingVisit(bookingId) == false) {
             revert GP__CancelBooking__NotAvailable();
         }
 
         Booking memory booking = bookings.get(bookingId);
+
+        if (
+            _isAdmin(msg.sender) == false &&
+            booking.patientAddress != msg.sender
+        ) {
+            revert GP__CancelBooking__NotAllowed();
+        }
+
         bookings.cancel(bookingId);
 
         uint16 refundPercentage;
         if (_isAdmin(cancelBy)) {
             refundPercentage = GP_CANCELLATION_PERCENTAGE;
         } else if (booking.patientAddress == cancelBy) {
-            if (block.timestamp < block.timestamp - 2 hours) {
+            if (block.timestamp > booking.appointmentDate - 2 hours) {
                 refundPercentage = PATIENT_CANCELLATION_LESS_THAN_2H_PERCENTAGE;
-            } else if (block.timestamp < block.timestamp - 24 hours) {
+            } else if (block.timestamp > booking.appointmentDate - 24 hours) {
                 refundPercentage = PATIENT_CANCELLATION_LESS_THAN_24H_PERCENTAGE;
             } else {
                 refundPercentage = PATIENT_CANCELLATION_MORE_THAN_24H_PERCENTAGE;
@@ -264,6 +302,26 @@ contract GP {
         return admins.exists(adminAddress);
     }
 
+    function _getBooking(
+        uint256 bookingId
+    ) private view returns (Booking memory) {
+        Booking memory booking = bookings.get(bookingId);
+        if (
+            _isAdmin(msg.sender) ||
+            booking.patientAddress == msg.sender ||
+            booking.doctorAddress == msg.sender
+        ) {
+            return booking;
+        }
+
+        // Remove patient details
+        delete booking.patientAddress;
+        if (booking.status != BookingStatus.Available) {
+            booking.status = BookingStatus.Booked;
+        }
+        return booking;
+    }
+
     //
     //
     // Modifiers
@@ -280,6 +338,18 @@ contract GP {
     modifier onlyPatient() {
         if (patients.exists(msg.sender) == false) {
             revert GP__OnlyPatient__NotRegistered();
+        }
+        _;
+    }
+
+    modifier onlyDoctor(uint256 bookingId) {
+        if(bookings.exists(bookingId) == false) {
+            revert GP__OnlyDoctor__InvalidBooking();
+        }
+
+        if (bookings.get(bookingId).doctorAddress != msg.sender) {
+            // Since booking info is publicly accessible, it is fine to say the account is not the doctor
+            revert GP__OnlyDoctor__NotTheDoctor();
         }
         _;
     }

@@ -1,15 +1,15 @@
-import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers"
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs"
+import { time } from "@nomicfoundation/hardhat-network-helpers"
 import { expect } from "chai"
 import { ethers } from "hardhat"
 import { GP } from "../typechain-types"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
-import { isCallTrace } from "hardhat/internal/hardhat-network/stack-traces/message-trace"
 import { BookingStatus, Sex } from "./enums"
 
 const getTime = (date: Date | string) => {
   return Math.floor(new Date(date).getTime() / 1000)
 }
+
+const now = async () => await time.latest() * 1000
 
 describe("GP", function () {
   let gp: GP
@@ -263,7 +263,7 @@ describe("GP", function () {
       await gp.addDoctor(doctor.address, "Fredrick Simpson", "General")
 
       // Add booking
-      const expectedDate = new Date(Date.now() + 60 * 60 * 1000) // 1 hour in the future
+      const expectedDate = new Date(await now() + 60 * 60 * 1000) // 1 hour in the future
       const expectedDateKey = `${expectedDate.getFullYear()}-${String(
         expectedDate.getMonth()
       ).padStart(1, "0")}-${String(expectedDate.getDate()).padStart(1, "0")}`
@@ -285,7 +285,6 @@ describe("GP", function () {
         doctorAddress,
         fee,
         patientAddress,
-        patientNote,
         status,
       } = await gp.getBooking(bookings[0])
       expect({
@@ -295,7 +294,6 @@ describe("GP", function () {
         doctorAddress,
         fee,
         patientAddress,
-        patientNote,
         status,
       }).to.deep.equal({
         active: true,
@@ -304,7 +302,6 @@ describe("GP", function () {
         doctorAddress: doctor.address,
         fee: expectedFee,
         patientAddress: "0",
-        patientNote: "",
         status: BookingStatus.Available,
       })
     })
@@ -316,7 +313,7 @@ describe("GP", function () {
       await gp.addDoctor(doctor.address, "Fredrick Simpson", "General")
 
       // Add booking
-      const expectedDate = new Date(Date.now() + 60 * 60 * 1000) // 1 hour in the future
+      const expectedDate = new Date(await now() + 60 * 60 * 1000) // 1 hour in the future
       const expectedDateKey = `${expectedDate.getFullYear()}-${String(
         expectedDate.getMonth()
       ).padStart(1, "0")}-${String(expectedDate.getDate()).padStart(1, "0")}`
@@ -341,13 +338,15 @@ describe("GP", function () {
     let doctor: SignerWithAddress
     let patient: SignerWithAddress
     let nonPatient: SignerWithAddress
-    const expectedDate = new Date(Date.now() + 60 * 60 * 1000) // 1 hour in the future
-    const expectedDateKey = `${expectedDate.getFullYear()}-${String(
-      expectedDate.getMonth()
-    ).padStart(1, "0")}-${String(expectedDate.getDate()).padStart(1, "0")}`
     const expectedFee = ethers.utils.parseEther("0.001")
+    let expectedDate: Date, expectedDateKey: string
 
     beforeEach(async () => {
+      expectedDate = new Date(await now() + 60 * 60 * 1000) // 1 hour in the future
+      expectedDateKey = `${expectedDate.getFullYear()}-${String(
+        expectedDate.getMonth()
+      ).padStart(1, "0")}-${String(expectedDate.getDate()).padStart(1, "0")}`
+
       ;[, doctor, patient, nonPatient] = await ethers.getSigners()
 
       // Add doctor
@@ -386,7 +385,6 @@ describe("GP", function () {
         doctorAddress,
         fee,
         patientAddress,
-        patientNote,
         status,
       } = await gp.getBooking(0)
       expect({
@@ -396,7 +394,6 @@ describe("GP", function () {
         doctorAddress,
         fee,
         patientAddress,
-        patientNote,
         status,
       }).to.deep.equal({
         active: true,
@@ -405,9 +402,14 @@ describe("GP", function () {
         doctorAddress: doctor.address,
         fee: expectedFee,
         patientAddress: patient.address,
-        patientNote: "Headache and sore throat",
         status: BookingStatus.Booked,
       })
+
+      const notes = await gp.getNotes(patientAddress)
+      const note = await gp.getNote(notes.at(-1)!)
+      expect(note.addedBy).to.equal(patient.address)
+      expect(note.timestamp).to.be.greaterThan(0)
+      expect(note.note).to.equal("Headache and sore throat")
     })
 
     it("should not book when not enough fee is paid", async () => {
@@ -468,14 +470,402 @@ describe("GP", function () {
 
       const [bookingId] = await gp.getBookings("2022-01-01")
 
-      const tx = gp.connect(patient).book(bookingId, "Headache and sore throat", {
-        value: expectedFee,
-      })
+      const tx = gp
+        .connect(patient)
+        .book(bookingId, "Headache and sore throat", {
+          value: expectedFee,
+        })
 
       await expect(tx).to.be.revertedWithCustomError(
         gp,
         "GP__Book__NotAvailable"
       )
+    })
+  })
+
+  describe("cancelBooking", () => {
+    let doctor: SignerWithAddress
+    let patient: SignerWithAddress
+    let nonPatient: SignerWithAddress
+    const generateDate = async (hoursToAddToNow: number) =>
+      new Date(await now() + hoursToAddToNow * 60 * 60 * 1000)
+    const generateDateKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth()).padStart(
+        1,
+        "0"
+      )}-${String(date.getDate()).padStart(1, "0")}`
+    const expectedFee = ethers.utils.parseEther("0.001")
+
+    beforeEach(async () => {
+      ;[, doctor, patient, nonPatient] = await ethers.getSigners()
+
+      // Add doctor
+      await gp.addDoctor(doctor.address, "Fredrick Simpson", "General")
+
+      // Add patient
+      await gp["addPatient(address,string,uint256,uint8)"](
+        patient.address,
+        "Tom Brandt",
+        getTime("1982-12-18"),
+        Sex.Male
+      )
+    })
+
+    it("should cancel booking and refund 100% of the fee when requested by patient more than 24 hours before the appointment", async () => {
+      const date = await generateDate(25) // 25 hours from now
+      const dateKey = generateDateKey(date)
+      await gp.addBooking(getTime(date), dateKey, doctor.address, expectedFee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: expectedFee,
+      })
+
+      // Cancel booking
+      const tx = gp.connect(patient).cancelBooking(0)
+      expect(tx)
+        .to.emit(gp, "AppointmentCancelled")
+        .withArgs(0, doctor.address, getTime(date))
+
+      const { patientAddress, status } = await gp.connect(doctor).getBooking(0)
+      expect({ patientAddress, status }).to.deep.equal({
+        patientAddress: patient.address,
+        status: BookingStatus.Cancelled,
+      })
+
+      // Check if new booking is created
+      const bookings = await gp.getBookings(dateKey)
+      const newBooking = await gp.getBooking(bookings.at(-1)!)
+      expect(newBooking.appointmentDate).to.equal(getTime(date))
+      expect(newBooking.appointmentDateKey).to.equal(dateKey)
+      expect(newBooking.doctorAddress).to.equal(doctor.address)
+      expect(newBooking.fee).to.equal(expectedFee)
+      expect(newBooking.status).to.equal(BookingStatus.Available)
+
+      const { balance } = await gp.getPatient(patient.address)
+      expect(balance).to.equal(expectedFee)
+
+      const notes = await gp.getNotes(patient.address)
+      const note = await gp.getNote(notes.at(-1)!)
+      expect(note.addedBy).to.equal(patient.address)
+      expect(note.note).to.equal(`Refunded amount: ${balance}`)
+    })
+
+    it("should cancel booking and refund 50% of the fee when requested by patient less than 24 hours before the appointment", async () => {
+      const date = await generateDate(23) // 23 hours from now
+      const dateKey = generateDateKey(date)
+      await gp.addBooking(getTime(date), dateKey, doctor.address, expectedFee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: expectedFee,
+      })
+
+      // Cancel booking
+      const tx = gp.connect(patient).cancelBooking(0)
+      expect(tx)
+        .to.emit(gp, "AppointmentCancelled")
+        .withArgs(0, doctor.address, getTime(date))
+
+      const { patientAddress, status } = await gp.connect(doctor).getBooking(0)
+      expect({ patientAddress, status }).to.deep.equal({
+        patientAddress: patient.address,
+        status: BookingStatus.Cancelled,
+      })
+
+      // Check if new booking is created
+      const bookings = await gp.getBookings(dateKey)
+      const newBooking = await gp.getBooking(bookings.at(-1)!)
+      expect(newBooking.appointmentDate).to.equal(getTime(date))
+      expect(newBooking.appointmentDateKey).to.equal(dateKey)
+      expect(newBooking.doctorAddress).to.equal(doctor.address)
+      expect(newBooking.fee).to.equal(expectedFee)
+      expect(newBooking.status).to.equal(BookingStatus.Available)
+
+      const { balance } = await gp.getPatient(patient.address)
+      expect(balance).to.equal(expectedFee.div(2))
+
+      const notes = await gp.getNotes(patient.address)
+      const note = await gp.getNote(notes.at(-1)!)
+      expect(note.addedBy).to.equal(patient.address)
+      expect(note.note).to.equal(`Refunded amount: ${balance}`)
+    })
+
+    it("should cancel booking and not refund any fee when requested by patient less than 2 hours before the appointment", async () => {
+      const date = await generateDate(1) // 1 hours from now
+      const dateKey = generateDateKey(date)
+      await gp.addBooking(getTime(date), dateKey, doctor.address, expectedFee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: expectedFee,
+      })
+
+      // Cancel booking
+      const tx = gp.connect(patient).cancelBooking(0)
+      expect(tx)
+        .to.emit(gp, "AppointmentCancelled")
+        .withArgs(0, doctor.address, getTime(date))
+
+      const { patientAddress, status } = await gp.connect(doctor).getBooking(0)
+      expect({ patientAddress, status }).to.deep.equal({
+        patientAddress: patient.address,
+        status: BookingStatus.Cancelled,
+      })
+
+      // Check if new booking is created
+      const bookings = await gp.getBookings(dateKey)
+      const newBooking = await gp.getBooking(bookings.at(-1)!)
+      expect(newBooking.appointmentDate).to.equal(getTime(date))
+      expect(newBooking.appointmentDateKey).to.equal(dateKey)
+      expect(newBooking.doctorAddress).to.equal(doctor.address)
+      expect(newBooking.fee).to.equal(expectedFee)
+      expect(newBooking.status).to.equal(BookingStatus.Available)
+
+      const { balance } = await gp.getPatient(patient.address)
+      expect(balance).to.equal(0)
+    })
+
+    it("should cancel booking and refund 110% of the fee when requested by admin", async () => {
+      const date = await generateDate(25) // 25 hours from now
+      const dateKey = generateDateKey(date)
+      await gp.addBooking(getTime(date), dateKey, doctor.address, expectedFee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: expectedFee,
+      })
+
+      // Cancel booking by admin
+      const tx = gp.connect(deployer).cancelBooking(0)
+      expect(tx)
+        .to.emit(gp, "AppointmentCancelled")
+        .withArgs(0, doctor.address, getTime(date))
+
+      const { patientAddress, status } = await gp.connect(doctor).getBooking(0)
+      expect({ patientAddress, status }).to.deep.equal({
+        patientAddress: patient.address,
+        status: BookingStatus.Cancelled,
+      })
+
+      // Check if new booking is created
+      const bookings = await gp.getBookings(dateKey)
+      const newBooking = await gp.getBooking(bookings.at(-1)!)
+      expect(newBooking.appointmentDate).to.equal(getTime(date))
+      expect(newBooking.appointmentDateKey).to.equal(dateKey)
+      expect(newBooking.doctorAddress).to.equal(doctor.address)
+      expect(newBooking.fee).to.equal(expectedFee)
+      expect(newBooking.status).to.equal(BookingStatus.Available)
+
+      const { balance } = await gp.getPatient(patient.address)
+      expect(balance).to.equal(expectedFee.mul(110).div(100))
+
+      const notes = await gp.getNotes(patient.address)
+      const note = await gp.getNote(notes.at(-1)!)
+      expect(note.addedBy).to.equal(deployer.address)
+      expect(note.note).to.equal(`Refunded amount: ${balance}`)
+    })
+
+    it("should not cancel booking if appointment is in the past", async () => {
+      const date = await generateDate(1) // 1 hour from now
+      const dateKey = generateDateKey(date)
+      await gp.addBooking(getTime(date), dateKey, doctor.address, expectedFee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: expectedFee,
+      })
+
+      // Move block time by 2 hours so the appointment is in the past
+      await time.increase(3600 * 2)
+
+      // Cancel booking by admin
+      const tx = gp.connect(patient).cancelBooking(0)
+      await expect(tx).to.be.revertedWithCustomError(
+        gp,
+        "GP__CancelBooking__NotAvailable"
+      )
+    })
+
+    it("should not cancel booking if cancelled by doctor account", async () => {
+      const date = await generateDate(36) // 36 hours from now
+      const dateKey = generateDateKey(date)
+      await gp.addBooking(getTime(date), dateKey, doctor.address, expectedFee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: expectedFee,
+      })
+
+      // Cancel booking by admin
+      const tx = gp.connect(doctor).cancelBooking(0)
+      await expect(tx).to.be.revertedWithCustomError(
+        gp,
+        "GP__CancelBooking__NotAllowed"
+      )
+    })
+
+    it("should not cancel booking if cancelled by other account", async () => {
+      const date = await generateDate(36) // 36 hours from now
+      const dateKey = generateDateKey(date)
+      await gp.addBooking(getTime(date), dateKey, doctor.address, expectedFee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: expectedFee,
+      })
+
+      // Cancel booking by admin
+      const tx = gp.connect(nonPatient).cancelBooking(0)
+      await expect(tx).to.be.revertedWithCustomError(
+        gp,
+        "GP__CancelBooking__NotAllowed"
+      )
+    })
+
+    it("should revert cancel booking if booking does not exist", async () => {
+      // Cancel non-existent booking by admin
+      const tx = gp.connect(patient).cancelBooking(1000)
+      await expect(tx).to.be.revertedWithCustomError(
+        gp,
+        "GP__CancelBooking__InvalidBooking"
+      )
+    })
+  })
+
+  describe("markBookingAsNoShowUp", () => {
+    let doctor: SignerWithAddress
+    let otherDoctor: SignerWithAddress
+    let patient: SignerWithAddress
+    let nonPatient: SignerWithAddress
+    const fee = ethers.utils.parseEther("0.001")
+    let date: Date, dateKey: string
+
+    beforeEach(async () => {
+      date = new Date(await now() + 60 * 60 * 1000)
+      dateKey = `${date.getFullYear()}-${String(date.getMonth()).padStart(
+        1,
+        "0"
+      )}-${String(date.getDate()).padStart(1, "0")}`
+
+      ;[, doctor, otherDoctor, patient, nonPatient] = await ethers.getSigners()
+
+      // Add doctor
+      await gp.addDoctor(doctor.address, "Fredrick Simpson", "General")
+
+      // Add patient
+      await gp["addPatient(address,string,uint256,uint8)"](
+        patient.address,
+        "Tom Brandt",
+        getTime("1982-12-18"),
+        Sex.Male
+      )
+
+      await gp.addBooking(getTime(date), dateKey, doctor.address, fee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: fee,
+      })
+
+      await gp.addBooking(getTime(date), dateKey, otherDoctor.address, fee)
+      await gp.connect(patient).book(1, "Stomach pain", {
+        value: fee,
+      })
+    })
+
+    it("should mark booking as no show up when account is the doctor", async () => {
+      await gp.connect(doctor).markBookingAsNoShowUp(0)
+
+      const booking = await gp.getBooking(0)
+      expect(booking.status).to.equal(BookingStatus.NoShowUp)
+    })
+
+    it("should revert marking booking as no show up when account is the patient", async () => {
+      const tx = gp.connect(patient).markBookingAsNoShowUp(0)
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__NotTheDoctor")
+    })
+
+    it("should revert marking booking as no show up when account is an admin", async () => {
+      const tx = gp.connect(deployer).markBookingAsNoShowUp(0)
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__NotTheDoctor")
+    })
+
+    it("should revert marking booking as no show up when other account is used", async () => {
+      const tx = gp.connect(nonPatient).markBookingAsNoShowUp(0)
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__NotTheDoctor")
+    })
+
+    it("should revert marking booking as no show up when booking does not exist", async () => {
+      const tx = gp.connect(doctor).markBookingAsNoShowUp(1000)
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__InvalidBooking")
+    })
+
+    it("should revert marking booking as no show up when doctor is not the booking's doctor", async () => {
+      const tx = gp.connect(doctor).markBookingAsNoShowUp(1)
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__NotTheDoctor")
+    })
+  })
+
+  describe("markBookingAsVisited", () => {
+    let doctor: SignerWithAddress
+    let otherDoctor: SignerWithAddress
+    let patient: SignerWithAddress
+    let nonPatient: SignerWithAddress
+    const fee = ethers.utils.parseEther("0.001")
+    let date: Date, dateKey: string
+
+    beforeEach(async () => {
+      date = new Date(await now() + 60 * 60 * 1000)
+      dateKey = `${date.getFullYear()}-${String(date.getMonth()).padStart(
+        1,
+        "0"
+      )}-${String(date.getDate()).padStart(1, "0")}`
+
+      ;[, doctor, otherDoctor, patient, nonPatient] = await ethers.getSigners()
+
+      // Add doctor
+      await gp.addDoctor(doctor.address, "Fredrick Simpson", "General")
+
+      // Add patient
+      await gp["addPatient(address,string,uint256,uint8)"](
+        patient.address,
+        "Tom Brandt",
+        getTime("1982-12-18"),
+        Sex.Male
+      )
+
+      await gp.addBooking(getTime(date), dateKey, doctor.address, fee)
+      await gp.connect(patient).book(0, "Stomach pain", {
+        value: fee,
+      })
+
+      await gp.addBooking(getTime(date), dateKey, otherDoctor.address, fee)
+      await gp.connect(patient).book(1, "Stomach pain", {
+        value: fee,
+      })
+    })
+
+    it("should mark booking as visited when account is the doctor", async () => {
+      await gp.connect(doctor).markBookingAsVisited(0, "The patient is fine")
+
+      const booking = await gp.getBooking(0)
+      expect(booking.status).to.equal(BookingStatus.Visited)
+
+      const notes = await gp.getNotes(patient.address)
+      const note = await gp.getNote(notes.at(-1)!)
+      expect(note.note).to.equal("The patient is fine")
+      expect(note.addedBy).to.equal(doctor.address)
+      expect(note.timestamp).to.be.greaterThan(0)
+    })
+
+    it("should revert marking booking as visited when account is the patient", async () => {
+      const tx = gp.connect(patient).markBookingAsVisited(0, "The patient is fine")
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__NotTheDoctor")
+    })
+
+    it("should revert marking booking as visited when account is an admin", async () => {
+      const tx = gp.connect(deployer).markBookingAsVisited(0, "The patient is fine")
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__NotTheDoctor")
+    })
+
+    it("should revert marking booking as visited when other account is used", async () => {
+      const tx = gp.connect(nonPatient).markBookingAsVisited(0, "The patient is fine")
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__NotTheDoctor")
+    })
+
+    it("should revert marking booking as visited when booking does not exist", async () => {
+      const tx = gp.connect(doctor).markBookingAsVisited(1000, "The patient is fine")
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__InvalidBooking")
+    })
+
+    it("should revert marking booking as visited when doctor is not the booking's doctor", async () => {
+      const tx = gp.connect(doctor).markBookingAsVisited(1, "The patient is fine")
+      await expect(tx).to.be.revertedWithCustomError(gp, "GP__OnlyDoctor__NotTheDoctor")
     })
   })
 

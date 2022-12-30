@@ -28,8 +28,7 @@ library BookingsHelper {
             appointmentDate: date,
             appointmentDateKey: dateKey,
             patientAddress: address(0),
-            doctorAddress: doctorAddress,
-            patientNote: ""
+            doctorAddress: doctorAddress
         });
 
         bookings.bookings.push(booking);
@@ -51,21 +50,36 @@ library BookingsHelper {
     function book(
         Bookings storage bookings,
         uint256 index,
-        address patientAddress,
-        string memory note
+        address patientAddress
     ) internal {
         bookings.bookings[index].patientAddress = patientAddress;
-        bookings.bookings[index].patientNote = note;
         bookings.bookings[index].status = BookingStatus.Booked;
         bookings.patientsBookings[patientAddress].add(index);
     }
 
     function cancel(Bookings storage bookings, uint256 index) internal {
-        address patientAddress = bookings.bookings[index].patientAddress;
-        bookings.patientsBookings[patientAddress].remove(index);
-        bookings.bookings[index].patientAddress = address(0);
-        bookings.bookings[index].patientNote = "";
-        bookings.bookings[index].status = BookingStatus.Available;
+        // To cancel, we remove references to the booking and add a new one with the same details
+        bookings.bookings[index].status = BookingStatus.Cancelled;
+        Booking memory booking = bookings.bookings[index];
+        bookings.patientsBookings[booking.patientAddress].remove(index);
+        bookings.doctorsBookings[booking.doctorAddress].remove(index);
+        bookings.byDate[booking.appointmentDateKey].remove(index);
+
+        add(
+            bookings,
+            booking.appointmentDate,
+            booking.appointmentDateKey,
+            booking.doctorAddress,
+            booking.fee
+        );
+    }
+
+    function markAsVisited(Bookings storage bookings, uint256 index) internal {
+        bookings.bookings[index].status = BookingStatus.Visited;
+    }
+
+    function markAsNoShowUp(Bookings storage bookings, uint256 index) internal {
+        bookings.bookings[index].status = BookingStatus.NoShowUp;
     }
 
     function isAvailable(
@@ -106,7 +120,7 @@ library BookingsHelper {
         Bookings storage bookings,
         uint256 bookingId
     ) internal view returns (bool) {
-        if(bookingId < 0 || bookingId > bookings.bookings.length) {
+        if (bookingId < 0 || bookingId > bookings.bookings.length) {
             return false;
         }
 

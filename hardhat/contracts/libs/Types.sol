@@ -12,7 +12,8 @@ enum BookingStatus {
     Available,
     Booked,
     Visited,
-    NoShowUp
+    NoShowUp,
+    Cancelled
 }
 
 struct Admin {
@@ -30,7 +31,6 @@ struct Note {
     string note;
     uint256 timestamp;
     address addedBy;
-    address patientAddress;
 }
 
 struct Patient {
@@ -45,7 +45,6 @@ struct Booking {
     bool active;
     address doctorAddress;
     address patientAddress;
-    string patientNote;
     uint256 fee;
     uint256 appointmentDate;
     string appointmentDateKey;
