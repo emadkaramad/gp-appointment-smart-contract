@@ -108,11 +108,16 @@ contract GP {
         _withdrawPatientBalance(msg.sender);
     }
 
-    function markBookingAsNoShowUp(uint256 bookingId) external onlyDoctor(bookingId) {
+    function markBookingAsNoShowUp(
+        uint256 bookingId
+    ) external onlyDoctor(bookingId) {
         bookings.markAsNoShowUp(bookingId);
     }
 
-    function markBookingAsVisited(uint256 bookingId, string memory note) external onlyDoctor(bookingId) {
+    function markBookingAsVisited(
+        uint256 bookingId,
+        string memory note
+    ) external onlyDoctor(bookingId) {
         bookings.markAsVisited(bookingId);
         Booking memory booking = bookings.get(bookingId);
         notes.add(note, msg.sender, booking.patientAddress, bookingId);
@@ -134,8 +139,16 @@ contract GP {
 
     function getPatient(
         address patientAddress
-    ) external view onlyAdmin returns (Patient memory) {
-        return patients.get(patientAddress);
+    ) external view returns (Patient memory) {
+        if (
+            _isAdmin(msg.sender) ||
+            _isDoctor(msg.sender) ||
+            msg.sender == patientAddress
+        ) {
+            return patients.get(patientAddress);
+        }
+
+        revert GP__GetPatient__NotAllowed();
     }
 
     function getDoctors() external view returns (address[] memory) {
@@ -167,8 +180,15 @@ contract GP {
     }
 
     function getNote(uint256 noteId) external view returns (Note memory) {
-        return notes.get(noteId);
+        if (notes.hasAccess(noteId, msg.sender)) {
+            return notes.get(noteId);
+        }
+
+        revert GP__GetNote__NotAllowed();
     }
+
+    // To allow funding the contract
+    receive() external payable {}
 
     //
     //
@@ -294,7 +314,7 @@ contract GP {
             ""
         );
         if (refunded == false) {
-            revert GP__WithdrawPatientBalance__RefundFailed();
+            revert GP__WithdrawPatientBalance__TransactionFailed();
         }
     }
 
@@ -302,9 +322,17 @@ contract GP {
         return admins.exists(adminAddress);
     }
 
+    function _isDoctor(address doctorAddress) private view returns (bool) {
+        return doctors.exists(doctorAddress);
+    }
+
     function _getBooking(
         uint256 bookingId
     ) private view returns (Booking memory) {
+        if (bookings.exists(bookingId) == false) {
+            revert GP__GetBooking__InvalidBooking();
+        }
+
         Booking memory booking = bookings.get(bookingId);
         if (
             _isAdmin(msg.sender) ||
@@ -312,6 +340,13 @@ contract GP {
             booking.doctorAddress == msg.sender
         ) {
             return booking;
+        }
+
+        if (
+            patients.exists(msg.sender) == false &&
+            doctors.exists(msg.sender) == false
+        ) {
+            revert GP__GetBooking__NotRegistered();
         }
 
         // Remove patient details
@@ -343,7 +378,7 @@ contract GP {
     }
 
     modifier onlyDoctor(uint256 bookingId) {
-        if(bookings.exists(bookingId) == false) {
+        if (bookings.exists(bookingId) == false) {
             revert GP__OnlyDoctor__InvalidBooking();
         }
 
