@@ -3,6 +3,9 @@ USE ?= bun
 ifeq (${USE}, npm)
 	PACKAGE_MANAGER ?= npm
 	PACKAGE_EXECUTOR ?= npx
+else ifeq (${USE}, yarn)
+	PACKAGE_MANAGER ?= yarn
+	PACKAGE_EXECUTOR ?= npx
 else
 	PACKAGE_MANAGER ?= bun
 	PACKAGE_EXECUTOR ?= bunx

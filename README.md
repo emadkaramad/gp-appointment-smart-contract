@@ -1,6 +1,6 @@
-# Private GP appointment system
+# Simple GP appointment smart contract
 
-This project is an appointment system for a private GP using smart contracts.
+This project is a solidity smart contrct for booking GP appointments.
 
 ## Stack
 
@@ -28,14 +28,29 @@ This project is an appointment system for a private GP using smart contracts.
 - When refereed to specialist, patient can book an appointment with them
 - Doctors can add summary against the patient record
 
-## Installation
+## Prerequisites
 
-First, you need to install [GNU Make](https://www.gnu.org/software/make/) and [bun JavaScript runtime](https://bun.sh).
+- [GNU Make](https://www.gnu.org/software/make/)
+- [Bunjs](https://bun.sh) or [Nodejs](https://nodejs.org/en/download/)
 
-Once `bun` is installed, run the following `make` command to install and run the application:
+## Run the app
+
+The following make command install packages, run the hardhat node, deploy the contract, and run the web app using Bunjs runtime.
+Bunjs is much faster in installing packages comparing to `npm` (2x faster) and `yarn` (3x faster).
 
 ```sh
 $ make start
+```
+
+If you would like to use Nodejs, you can use either `npm` or `yarn` to install and run the app:
+
+```sh
+$ USE=npm make start
+```
+or
+
+```sh
+$ USE=yarn make start
 ```
 
 Open `http://localhost:3000` in your browser to access the web application.

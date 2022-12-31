@@ -31,13 +31,30 @@ jobs:
   npm-build-test:
     runs-on: ubuntu-latest
     env:
-      PACKAGE_MANAGER: npm
-      PACKAGE_EXECUTOR: npx
+      USE: npm
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
           node-version: 18
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Run hardhat tests
+        run: make hardhat-test
+
+  yarn-build-test:
+    runs-on: ubuntu-latest
+    env:
+      USE: yarn
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install yarn
+        run: npm install --global yarn
 
       - name: Install dependencies
         run: make install
