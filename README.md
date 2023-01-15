@@ -8,9 +8,8 @@ This project is a solidity smart contrct for booking GP appointments.
 - Bun (Fast all-in-one JavaScript runtime)
 - Hardhat (Build and test contracts)
 - Nextjs (React framework)
-- Chakra UI (React components)
-- Web3.js (Client-side library to interact with the blockchain)
-- Ethers.js (Client-side library to interact with the blockchain)
+- Tailwind CSS (CSS framework)
+- Ethers.js (Library to interact with the blockchain)
 - Eth security toolbox (Tools to scan contracts for vulnerabilities)
 - PM2 (Process manager for running web app and hardhat node in the background)
 
