@@ -1,5 +1,6 @@
 SHELL := /bin/bash
 USE ?= bun
+
 ifeq (${USE}, npm)
 	PACKAGE_MANAGER ?= npm
 	PACKAGE_EXECUTOR ?= npx
@@ -30,24 +31,40 @@ install:
 	)
 
 .PHONY: run
-run:
-	@${PACKAGE_EXECUTOR} pm2 flush --silent
+run-hardhat:
 	@( \
 		cd hardhat && \
 		echo "🚀 Starting hardhat node..." && \
 		${PACKAGE_EXECUTOR} pm2 delete hardhat-node --silent 2>/dev/null ||: && \
 		${PACKAGE_EXECUTOR} pm2 start "${PACKAGE_MANAGER} run node" --name hardhat-node --namespace web3 --silent \
 	)
+
+run-app:
 	@( \
 		cd app && \
 		echo "🚀 Starting web app..." && \
 		${PACKAGE_EXECUTOR} pm2 delete app --silent 2>/dev/null ||: && \
 		${PACKAGE_EXECUTOR} pm2 start "${PACKAGE_MANAGER} run start" --name app --namespace web3 --silent \
 	)
-	@echo "✅ Started" \
+
+run-app-dev:
+	@( \
+		cd app && \
+		echo "🚀 Starting web app..." && \
+		${PACKAGE_EXECUTOR} pm2 delete app --silent 2>/dev/null ||: && \
+		${PACKAGE_EXECUTOR} pm2 start "${PACKAGE_MANAGER} run dev" --name app --namespace web3 --silent \
+	)
+
+.PHONY: start-hardhat
+start-hardhat: install clear-logs run-hardhat deploy-contract
 
 .PHONY: start
-start: install run
+start: install clear-logs run-hardhat deploy-contract run-app
+	@echo "✅ Started"
+
+.PHONY: start-dev
+start-dev: install clear-logs run-hardhat deploy-contract run-app-dev
+	@echo "✅ Started (Dev)"
 
 .PHONY: stop
 stop:
@@ -56,6 +73,9 @@ stop:
 		${PACKAGE_EXECUTOR} pm2 delete web3 --silent 2>/dev/null && \
 		echo "🔴 Stopped" \
 	)
+
+.PHONY: clear-logs
+	@${PACKAGE_EXECUTOR} pm2 flush --silent
 
 .PHONY: hardhat-logs
 hardhat-logs:
@@ -69,9 +89,12 @@ app-logs:
 hardhat-test:
 	cd hardhat && ${PACKAGE_MANAGER} run test && cd -
 
-.PHONY: hardhat-deploy
-hardhat-deploy:
-	cd hardhat && ${PACKAGE_MANAGER} run deploy && cd -
+.PHONY: deploy-contract
+deploy-contract:
+	@( \
+		echo "✍️  Deploying GP contract..." && \
+		cd hardhat && ${PACKAGE_MANAGER} run deploy && cd - \
+	)
 
 .PHONY: format
 format:

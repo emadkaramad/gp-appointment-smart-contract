@@ -11,5 +11,6 @@
     {
       "path": "../common"
     }
-  ]
+  ],
+  "include": ["./hardhat.config.ts", "./scripts", "./deploy", "./test"]
 }

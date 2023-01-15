@@ -41,7 +41,7 @@ contract GP {
     uint16 private constant PATIENT_CANCELLATION_LESS_THAN_24H_PERCENTAGE = 50;
     uint16 private constant PATIENT_CANCELLATION_LESS_THAN_2H_PERCENTAGE = 0;
 
-    constructor(string memory gpName, string memory adminName) {
+    constructor(string memory gpName, string memory adminName) payable {
         name = gpName;
         admins.add(msg.sender, adminName);
     }
