@@ -1,0 +1,1 @@
+This folder contains contract address and abi generated and exported by hardhat-deploy.
