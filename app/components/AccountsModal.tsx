@@ -17,7 +17,7 @@ const AccountsModal: React.FC<Props> = ({
   provider,
   selectedAccount: currentSelectedAccount,
   selectAccount,
-  onClose,
+  onClose
 }: Props) => {
   const [isInitialized, setIsInitialized] = useState<boolean>(false)
   const [mnemonics, setMnemonics] = useState<string[]>([])
@@ -44,15 +44,15 @@ const AccountsModal: React.FC<Props> = ({
   }, [provider])
 
   return (
-    <Modal title="Select an account" onClose={onClose}>
+    <Modal title="Choose an account" onClose={onClose}>
       {!isInitialized && <p>Loading...</p>}
       {isInitialized && !mnemonics.length && (
         <p>{"There are no accounts to select."}</p>
       )}
       {isInitialized &&
-        mnemonics.map((mnemonic, index) => (
+        mnemonics.map((mnemonic) => (
           <AccountInfo
-            key={index}
+            key={mnemonic}
             provider={provider}
             mnemonic={mnemonic}
             onSelectAccount={selectAccount}
@@ -63,7 +63,9 @@ const AccountsModal: React.FC<Props> = ({
         ))}
 
       <ButtonsRow>
-        <Button onClick={onClose} secondary>{"Close"}</Button>
+        <Button onClick={onClose} secondary>
+          {"Close"}
+        </Button>
         <Button onClick={newAccount}>{"Create a new account"}</Button>
       </ButtonsRow>
     </Modal>

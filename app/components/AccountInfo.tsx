@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react"
 import AddressLabel from "./AddressLabel"
 import BalanceLabel from "./BalanceLabel"
 import Button from "./Button"
+import { TrashIcon } from "@heroicons/react/24/solid"
 
 interface Props {
   provider?: ethers.providers.Provider
@@ -19,7 +20,7 @@ const AccountInfo: React.FC<Props> = ({
   isSelected,
   highlight,
   onSelectAccount,
-  onRemoveAccount,
+  onRemoveAccount
 }) => {
   const wallet = Wallet.fromMnemonic(mnemonic)
 
@@ -42,7 +43,7 @@ const AccountInfo: React.FC<Props> = ({
 
   const highlightClassNames = highlight ? "bg-amber-50" : ""
   const selectedRowClassNames = isSelected
-    ? "border-[3px] cursor-default"
+    ? "border-[2px] cursor-default"
     : "hover:bg-slate-200 cursor-pointer border-[1px]"
 
   return (
@@ -60,7 +61,9 @@ const AccountInfo: React.FC<Props> = ({
       </div>
       {!isSelected && (
         <div className="mx-[.5em]">
-          <Button onClick={() => onRemoveAccount(wallet)}>{"Remove"}</Button>
+          <Button onClick={() => onRemoveAccount(wallet)}>
+            <TrashIcon className="w-5 h-5" />
+          </Button>
         </div>
       )}
     </div>

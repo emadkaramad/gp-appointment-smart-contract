@@ -98,4 +98,16 @@ deploy-contract:
 
 .PHONY: format
 format:
-	${PACKAGE_EXECUTOR} prettier --write .
+	cd app && ${PACKAGE_EXECUTOR} rome format .
+
+.PHONY: format-fix
+format-fix:
+	cd app && ${PACKAGE_EXECUTOR} rome format --write .
+
+.PHONY: lint
+lint:
+	cd app && ${PACKAGE_EXECUTOR} rome check .
+
+.PHONY: lint-fix
+lint-fix:
+	cd app && ${PACKAGE_EXECUTOR} rome check --apply .

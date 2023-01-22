@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PACKAGE_MANAGER: ~/.bun/bin/bun
-      PACKAGE_EXECUTOR: ~/.bun/bin/bunx
+      PACKAGE_EXECUTOR: ~/.bun/bin/bun
     steps:
       - uses: actions/checkout@v3
 
@@ -24,6 +24,12 @@ jobs:
 
       - name: Install dependencies
         run: make install
+
+      - name: Check for formatting issues
+        run: make format
+
+      - name: Check for lint errors
+        run: make lint
 
       - name: Run hardhat tests
         run: make hardhat-test
@@ -40,6 +46,12 @@ jobs:
 
       - name: Install dependencies
         run: make install
+
+      - name: Check for formatting issues
+        run: make format
+
+      - name: Check for lint errors
+        run: make lint
 
       - name: Run hardhat tests
         run: make hardhat-test
@@ -58,6 +70,12 @@ jobs:
 
       - name: Install dependencies
         run: make install
+
+      - name: Check for formatting issues
+        run: make format
+
+      - name: Check for lint errors
+        run: make lint
 
       - name: Run hardhat tests
         run: make hardhat-test

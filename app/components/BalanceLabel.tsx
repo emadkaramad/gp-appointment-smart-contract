@@ -6,7 +6,9 @@ interface Props {
 }
 
 const BalanceLabel: React.FC<Props> = ({ balance, withBackground }: Props) => {
-  const formattedBalance = balance ? ethers.utils.formatEther(BigNumber.from(balance)) : "-.-"
+  const formattedBalance = balance
+    ? ethers.utils.formatEther(BigNumber.from(balance))
+    : "-.-"
   return (
     <span
       className={withBackground ? "bg-slate-200 rounded-[5px] px-2" : ""}

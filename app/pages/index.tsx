@@ -1,44 +1,35 @@
-import Head from "next/head"
-import { Wallet } from "ethers"
-import React, { useState } from "react"
-import Header from "../components/Header"
-import useStaticJsonRpc from "../libs/useStaticJsonRpc"
-import getContract from "../libs/getContract"
-
-const chainId = 31337 // Hardhat
-const hardhatAddress = "http://localhost:8545" // window.ethereum
+import React, { useContext } from "react"
+import { H1, H2 } from "../components/Heading"
+import HeroButton from "../components/HeroButton"
+import Page from "../components/Page"
+import AppContext from "./AppContext"
 
 export default function Home() {
-  const provider = useStaticJsonRpc(hardhatAddress)
-  const [selectedAccount, setSelectedAccount] = useState<Wallet>()
-  const contract = getContract(provider, chainId)
-
-  const selectAccount = (account: Wallet) => {
-    if (provider) {
-      setSelectedAccount(account.connect(provider))
-    }
-  }
+  const { selectedAccount } = useContext(AppContext)
 
   return (
-    <>
-      <Head>
-        <title>Simple GP Appointment Smart Contract</title>
-        <meta
-          name="description"
-          content="Simple GP Appointment Smart Contract"
-        />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-      <main>
-        {provider && (
-          <Header
-            provider={provider}
-            selectedAccount={selectedAccount}
-            onSelectAccount={selectAccount}
-          />
+    <Page dark full>
+      <div className="text-[8em] absolute top-[.7em] left-0 text-white/30 uppercase tracking-wider">
+        GP
+        <br />
+        Appointment
+        <br />
+        Smart Contract
+      </div>
+      <div className="my-[3em] text-center">
+        {/* <H1>GP Appointment System</H1> */}
+
+        {selectedAccount && (
+          <>
+            <H1>Which view would you like to access?</H1>
+            <div className="child:mx-4 absolute top-[40%] left-[50%] translate-x-[-50%]">
+              <HeroButton href="/admin">Admin</HeroButton>
+              <HeroButton href="/doctor">Doctor</HeroButton>
+              <HeroButton href="/patient">Patient</HeroButton>
+            </div>
+          </>
         )}
-      </main>
-    </>
+      </div>
+    </Page>
   )
 }

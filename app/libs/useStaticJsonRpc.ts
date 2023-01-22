@@ -1,9 +1,10 @@
 import { ethers } from "ethers"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useContext, useEffect, useState } from "react"
+import AppContext from "../pages/AppContext"
 
 type ProviderUrl = string | ethers.utils.ConnectionInfo | undefined
 
-export default function useStaticJsonRpc(url: ProviderUrl) {
+export default function useStaticJsonRpc(url: string) {
   const [provider, setProvider] =
     useState<ethers.providers.StaticJsonRpcProvider>()
 
