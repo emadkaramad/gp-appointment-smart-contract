@@ -5,6 +5,9 @@ import useStaticJsonRpc from "../libs/useStaticJsonRpc"
 import WalletManager from "../libs/WalletManager"
 import { useEffect, useState } from "react"
 import { Wallet } from "ethers"
+import { QueryClient, QueryClientProvider } from "react-query"
+
+const queryClient = new QueryClient()
 
 export default function App({ Component, pageProps }: AppProps) {
   const provider = useStaticJsonRpc("http://localhost:8545")
@@ -25,12 +28,14 @@ export default function App({ Component, pageProps }: AppProps) {
     ...hardhatContext,
     provider,
     selectedAccount,
-    selectAccount
+    selectAccount,
   }
 
   return (
     <AppContext.Provider value={context}>
-      <Component {...pageProps} />
+      <QueryClientProvider client={queryClient}>
+        <Component {...pageProps} />
+      </QueryClientProvider>
     </AppContext.Provider>
   )
 }

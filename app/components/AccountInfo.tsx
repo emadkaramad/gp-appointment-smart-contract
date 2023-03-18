@@ -4,6 +4,7 @@ import AddressLabel from "./AddressLabel"
 import BalanceLabel from "./BalanceLabel"
 import Button from "./Button"
 import { TrashIcon } from "@heroicons/react/24/solid"
+import { useQuery } from "react-query"
 
 interface Props {
   provider?: ethers.providers.Provider
@@ -20,26 +21,19 @@ const AccountInfo: React.FC<Props> = ({
   isSelected,
   highlight,
   onSelectAccount,
-  onRemoveAccount
+  onRemoveAccount,
 }) => {
   const wallet = Wallet.fromMnemonic(mnemonic)
 
-  const [balance, setBalance] = useState<BigNumber>()
-
-  const accountInfoHandler = useCallback(async () => {
+  const fetchAccountInfo = async () => {
     if (!provider) {
       return
     }
 
-    const latestBalance = await wallet.connect(provider).getBalance()
-    if (latestBalance) {
-      setBalance(latestBalance)
-    }
-  }, [provider, mnemonic])
+    return await wallet.connect(provider).getBalance()
+  }
 
-  useEffect(() => {
-    accountInfoHandler()
-  }, [accountInfoHandler])
+  const { data: balance } = useQuery("account-info", fetchAccountInfo)
 
   const highlightClassNames = highlight ? "bg-amber-50" : ""
   const selectedRowClassNames = isSelected
