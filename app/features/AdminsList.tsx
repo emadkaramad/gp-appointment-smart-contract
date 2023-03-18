@@ -6,8 +6,13 @@ import ethers from "ethers"
 import TransactionError from "../types/TransactionError"
 import ButtonsRow from "../components/ButtonsRow"
 import Button from "../components/Button"
+import { H2 } from "../components/Heading"
 
-const AdminsList: React.FC = () => {
+interface Props {
+  onAdd: () => void
+}
+
+const AdminsList: React.FC<Props> = ({onAdd}) => {
   const { provider, selectedAccount } = useContext(AppContext)
   const [admins, setAdmins] = useState<string[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>()
@@ -37,11 +42,12 @@ const AdminsList: React.FC = () => {
 
   return (
     <>
+      <H2>{"Admins"}</H2>
       <ErrorMessage message={errorMessage} />
       {!errorMessage && (
         <>
           <ButtonsRow>
-            <Button onClick={() => {}}>Add</Button>
+            <Button onClick={onAdd}>Add</Button>
           </ButtonsRow>
           <div className="flex flex-col min-w-full">
             {admins.map((admin) => (
