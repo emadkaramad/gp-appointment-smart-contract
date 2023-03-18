@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-USE ?= bun
+USE ?= npm
 
 ifeq (${USE}, npm)
 	PACKAGE_MANAGER ?= npm
@@ -7,7 +7,7 @@ ifeq (${USE}, npm)
 else ifeq (${USE}, yarn)
 	PACKAGE_MANAGER ?= yarn
 	PACKAGE_EXECUTOR ?= npx
-else
+else ifeq (${USE}, bun)
 	PACKAGE_MANAGER ?= bun
 	PACKAGE_EXECUTOR ?= bunx
 endif
